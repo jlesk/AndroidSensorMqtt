@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">SensorApplication</string>
+    <string name="sensors_list">Sensors List</string>
+    <string name="light_sensor">Light Sensor</string>
+    <string name="string_light_sensor" />
+    <string name="string_string_light_sensor" />
+    <string name="porximity_sensor">Porximity Sensor</string>
+    <string name="rotation_sensor">Rotation Sensor</string>
+    <string name="step_counter_sensor">Step Counter Sensor</string>
+</resources>

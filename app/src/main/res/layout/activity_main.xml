@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/sensors_layout"
+        android:layout_margin="8dp"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/sensors"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/holo_red_dark"/>
+        <Button
+            android:id="@+id/sensors_list"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:onClick="sensorsList"
+            android:text="@string/sensors_list"/>
+
+        <Button
+            android:id="@+id/light_sensor"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="lightSensor"
+            android:text="@string/string_string_light_sensor"
+            tools:text="light_sensor" />
+        <Button
+            android:id="@+id/proximity_sensor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:onClick="proximitySensor"
+            android:text="@string/porximity_sensor"/>
+        <Button
+            android:id="@+id/rotation_sensor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:onClick="rotationSensor"
+            android:text="@string/rotation_sensor"/>
+        <Button
+            android:id="@+id/steps_sensor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@style/Widget.AppCompat.Button.Colored"
+            android:onClick="stepCounterSensor"
+            android:text="@string/step_counter_sensor"/>
+    </LinearLayout></ScrollView>
