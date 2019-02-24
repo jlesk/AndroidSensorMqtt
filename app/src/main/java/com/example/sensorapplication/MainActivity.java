@@ -5,13 +5,23 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import com.example.sensorapplication.R;
 
@@ -27,12 +37,55 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor lightSensor;
     private Sensor proximitySensor;
     private Sensor rotationSensor;
+    private Sensor gamerotationSensor;
+    private Sensor georotationSensor;
     private Sensor stepCounterSensor;
+    private Sensor accelerometerSensor;
+    private Sensor linearaccelerationSensor;
+    private Sensor magneticfieldSensor;
+    private Sensor gyroscopeSensor;
+    private SensorData sensorData;
+    private Vibrator v;
+    MqttHelper mqttHelper;
+    TextView dataReceived;
+
+
+
+    long startTime = 0;
+
+    //runs without a timer by reposting this handler at the end of the runnable
+    Handler timerHandler = new Handler();
+    Runnable timerRunnable = new Runnable() {
+
+        @Override
+        public void run() {
+            MqttMessage message = new MqttMessage();
+            Log.w("Debug", "3");
+
+            message.setPayload(sensorData.toJSon().getBytes());
+            Log.w("Debug", "4");
+            message.setRetained(false);
+            long millis = System.currentTimeMillis() - startTime;
+            int seconds = (int) (millis / 1000);
+            int minutes = seconds / 60;
+            seconds = seconds % 60;
+
+            timerHandler.postDelayed(this, 500);
+            Log.w("timer", "timer");
+            try {
+                mqttHelper.mqttAndroidClient.publish("sensors", message);
+            } catch (org.eclipse.paho.client.mqttv3.MqttPersistenceException mqttPersistenceException) {
+                Log.e("timer", "mqttPersistenceException");
+            } catch (org.eclipse.paho.client.mqttv3.MqttException mqttException) {
+                Log.e("timer", "mqttException");
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        sensorData = new SensorData();
         //setContentView(R.layout.activity_sensor);
         setContentView(R.layout.activity_main);
         sensorLayout = findViewById(R.id.sensors_layout);
@@ -41,9 +94,52 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
         lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
         proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY);
-        rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        gamerotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        georotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR);
+        accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        linearaccelerationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        magneticfieldSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        gyroscopeSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+
         stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        mqttHelper = new MqttHelper(getApplicationContext());
+        dataReceived = (TextView) findViewById(R.id.dataReceived);
+
+        startMqtt();
+
+        timerHandler.postDelayed(timerRunnable, 500);
+        v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+
+
+        // Acquire a reference to the system Location Manager
+        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        // Define a listener that responds to location updates
+        LocationListener locationListener = new LocationListener() {
+            public void onLocationChanged(Location location) {
+                // Called when a new location is found by the network location provider.
+                Log.w("location", "latitude " + location.getLatitude() + ", longitude " + location.getLongitude());
+            }
+
+            public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+            public void onProviderEnabled(String provider) {}
+
+            public void onProviderDisabled(String provider) {}
+        };
+
+// Register the listener with the Location Manager to receive location updates
+        try {
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+        } catch (Exception ex)  {
+            Log.e("location", "Error creating location service: " + ex.getMessage() );
+        }
+
     }
+
+
 
     public void sensorsList(View view){
         List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ALL);
@@ -91,7 +187,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public final void onSensorChanged(SensorEvent event) {
         //check sensor type matches current sensor type set by button click
         Log.w("Mqtt", "sensor changed " + event.sensor.getType() +  " " + sensorInd);
-        if( event.sensor.getType() == sensorInd){
+        //if( event.sensor.getType() == sensorInd){
             Log.w("Mqtt", "sensorInd");
             //light sensor
             if(event.sensor.getType() ==  Sensor.TYPE_LIGHT){
@@ -128,9 +224,129 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 Log.w("Mqtt", "pitch " + pitch);
                 Log.w("Mqtt", "roll " + roll);
             }
+            else if(event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+                Log.w("Mqtt", "TYPE_ROTATION_VECTOR");
+                float[] rotMatrix = new float[9];
+                float[] rotVals = new float[3];
 
-        }
+                SensorManager.getRotationMatrixFromVector(rotMatrix, event.values);
+                SensorManager.remapCoordinateSystem(rotMatrix,
+                        SensorManager.AXIS_X, SensorManager.AXIS_Y, rotMatrix);
+
+                SensorManager.getOrientation(rotMatrix, rotVals);
+                float azimuth = (float) Math.toDegrees(rotVals[0]);
+                float pitch = (float) Math.toDegrees(rotVals[1]);
+                float roll = (float) Math.toDegrees(rotVals[2]);
+                Log.w("Mqtt", "azimuth " + azimuth);
+                Log.w("Mqtt", "pitch " + pitch);
+                Log.w("Mqtt", "roll " + roll);
+                sensorData.SetRotationVector(azimuth, pitch, roll);
+
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR) {
+                Log.w("Mqtt", "TYPE_GEOMAGNETIC_ROTATION_VECTOR");
+                float[] rotMatrix = new float[9];
+                float[] rotVals = new float[3];
+
+                SensorManager.getRotationMatrixFromVector(rotMatrix, event.values);
+                SensorManager.remapCoordinateSystem(rotMatrix,
+                        SensorManager.AXIS_X, SensorManager.AXIS_Y, rotMatrix);
+
+                SensorManager.getOrientation(rotMatrix, rotVals);
+                float azimuth = (float) Math.toDegrees(rotVals[0]);
+                float pitch = (float) Math.toDegrees(rotVals[1]);
+                float roll = (float) Math.toDegrees(rotVals[2]);
+                Log.w("Mqtt", "azimuth " + azimuth);
+                Log.w("Mqtt", "pitch " + pitch);
+                Log.w("Mqtt", "roll " + roll);
+
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                Log.w("Mqtt", "TYPE_ACCELEROMETER");
+                float Xpp = event.values[0];
+                float Ypp = event.values[1];
+                float Zpp = event.values[2];
+                Log.w("Mqtt", "Xpp " + Xpp);
+                Log.w("Mqtt", "Ypp " + Ypp);
+                Log.w("Mqtt", "Zpp " + Zpp);
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
+                Log.w("Mqtt", "TYPE_LINEAR_ACCELERATION");
+                float Xpp = event.values[0];
+                float Ypp = event.values[1];
+                float Zpp = event.values[2];
+                Log.w("Mqtt", "Xpp " + Xpp);
+                Log.w("Mqtt", "Ypp " + Ypp);
+                Log.w("Mqtt", "Zpp " + Zpp);
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                Log.w("Mqtt", "TYPE_MAGNETIC_FIELD");
+                float Xpp = event.values[0];
+                float Ypp = event.values[1];
+                float Zpp = event.values[2];
+                Log.w("Mqtt", "Xpp " + Xpp);
+                Log.w("Mqtt", "Ypp " + Ypp);
+                Log.w("Mqtt", "Zpp " + Zpp);
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+                Log.w("Mqtt", "TYPE_GYROSCOPE");
+                float X = event.values[0];
+                float Y = event.values[1];
+                float Z = event.values[2];
+                Log.w("Mqtt", "X rad/s " + X);
+                Log.w("Mqtt", "Y rad/s" + Y);
+                Log.w("Mqtt", "Z rad/s" + Z);
+            }
+            else if(event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
+                Log.w("Mqtt", "TYPE_STEP_DETECTOR");
+                float steps = event.values[0];
+                textView.setText("steps : "+steps);
+                Log.w("Mqtt", "steps " + steps);
+            }
+
+        //}
     }
+
+
+    private void startMqtt(){
+        mqttHelper.mqttAndroidClient.setCallback(new MqttCallbackExtended() {
+            @Override
+            public void connectComplete(boolean b, String s) {
+                Log.w("Debug","Connected");
+            }
+
+            @Override
+            public void connectionLost(Throwable throwable) {
+
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
+                Log.w("Debug",mqttMessage.toString());
+                /*Log.w("Debug","test");
+
+                MqttMessage message = new MqttMessage();
+                Log.w("Debug", "3");
+
+                message.setPayload("hello".getBytes("UTF-8"));
+                Log.w("Debug", "4");
+                message.setRetained(false);
+                Log.w("Debug", "5");
+                mqttHelper.mqttAndroidClient.publish("demo2", message);
+                Log.w("Debug", "6");
+                mqttHelper.mqttAndroidClient.publish("demo2", mqttMessage);
+                Log.w("Debug", "7");*/
+                dataReceived.setText(mqttMessage.toString());
+                v.vibrate(300);
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken iMqttDeliveryToken) {
+
+            }
+        });
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
