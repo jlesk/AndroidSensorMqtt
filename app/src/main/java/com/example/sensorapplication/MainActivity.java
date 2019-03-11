@@ -10,6 +10,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.StrictMode;
 import android.os.Vibrator;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -18,14 +19,27 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.bson.BSONObject;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallbackExtended;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import com.example.sensorapplication.R;
-
+//import com.example.sensorapplication.R;
+import com.mongodb.BasicDBObject;
+//import com.mongodb.DB;
+import com.mongodb.DBCollection;
+//import com.mongodb.DBObject;
+import com.mongodb.DBObject;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoClientURI;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+//import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
@@ -45,11 +59,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor magneticfieldSensor;
     private Sensor gyroscopeSensor;
     private SensorData sensorData;
+
     private Vibrator v;
     MqttHelper mqttHelper;
     TextView dataReceived;
-
-
+    //DB db;
 
     long startTime = 0;
 
@@ -72,8 +86,43 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             timerHandler.postDelayed(this, 500);
             Log.w("timer", "timer");
+            StrictMode.ThreadPolicy old = StrictMode.getThreadPolicy();
+            //StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder(old)
+            //            .permitDiskWrites()
+            //            .build());
+            StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
+                    .permitAll().build();
+            StrictMode.setThreadPolicy(policy);
+            try {
+                MongoClientURI mongoUri = new MongoClientURI("mongodb://192.168.0.10:27017");
+                Log.w("timer", "got MongoClientURI");
+                MongoClient mongoClient = new MongoClient(mongoUri);
+                Log.w("timer", "got mongoClient");
+                MongoDatabase db = mongoClient.getDatabase("TEST");
+                Log.w("timer", "got database");
+
+
+                // Fetching the collection from the mongodb.
+                MongoCollection<Document> coll = db.getCollection("SENSORS_ANDROID");
+                Log.w("timer", "got collection");
+                Document doc = new Document();
+                Log.w("timer", "document created");
+                doc.put("sensordata", sensorData.toDoc());
+
+                Log.w("timer", "document put");
+                coll.insertOne(doc);
+                Log.w("timer", "document inserted");
+
+            } catch (Exception e) {
+                Log.w("timer", "Error connecting to mongodb database " );
+            }
+            StrictMode.setThreadPolicy(old);
+
             try {
                 mqttHelper.mqttAndroidClient.publish("sensors", message);
+                Log.w("timer", "mqtt published");
+
+
             } catch (org.eclipse.paho.client.mqttv3.MqttPersistenceException mqttPersistenceException) {
                 Log.e("timer", "mqttPersistenceException");
             } catch (org.eclipse.paho.client.mqttv3.MqttException mqttException) {
@@ -111,8 +160,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         timerHandler.postDelayed(timerRunnable, 500);
         v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
-
-
         // Acquire a reference to the system Location Manager
         LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
@@ -121,6 +168,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             public void onLocationChanged(Location location) {
                 // Called when a new location is found by the network location provider.
                 Log.w("location", "latitude " + location.getLatitude() + ", longitude " + location.getLongitude());
+                sensorData.SetLocation(location.getLatitude(), location.getLongitude());
             }
 
             public void onStatusChanged(String provider, int status, Bundle extras) {}
@@ -133,6 +181,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 // Register the listener with the Location Manager to receive location updates
         try {
             locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+
         } catch (Exception ex)  {
             Log.e("location", "Error creating location service: " + ex.getMessage() );
         }
@@ -269,6 +319,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 Log.w("Mqtt", "Xpp " + Xpp);
                 Log.w("Mqtt", "Ypp " + Ypp);
                 Log.w("Mqtt", "Zpp " + Zpp);
+                sensorData.SetAcceleration(Xpp, Ypp, Zpp);
+
             }
             else if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
                 Log.w("Mqtt", "TYPE_LINEAR_ACCELERATION");
