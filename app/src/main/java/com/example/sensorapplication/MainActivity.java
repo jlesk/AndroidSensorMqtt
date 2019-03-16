@@ -128,6 +128,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             } catch (org.eclipse.paho.client.mqttv3.MqttException mqttException) {
                 Log.e("timer", "mqttException");
             }
+            sensorData.ClearData();
         }
     };
 

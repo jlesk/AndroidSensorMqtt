@@ -39,6 +39,8 @@ public class SensorData {
             JSONObject rotation = new JSONObject(); // we need another object to store the address
             rotation.put("Azimuth", GetMeanFloat(RotationVectorAzimuth));
             rotation.put("Pitch", GetMeanFloat(RotationVectorPitch));
+            Log.w("toJSon", "roll " + GetMeanFloat(RotationVectorRoll));
+
             rotation.put("Roll", GetMeanFloat(RotationVectorRoll));
 
             // We add the object to the main object
@@ -74,6 +76,8 @@ public class SensorData {
             Document doc = new Document();
             Log.w("timer", "document created");
             doc.put("Azimuth", GetMeanFloat(RotationVectorAzimuth));
+            Log.w("toJSon", "roll " + GetMeanFloat(RotationVectorRoll));
+
             doc.put("Pitch", GetMeanFloat(RotationVectorPitch));
             doc.put("Roll", GetMeanFloat(RotationVectorRoll));
             pdoc.put("Rotation", doc);
@@ -87,6 +91,10 @@ public class SensorData {
         return new Document("","");
     }
     public void SetRotationVector(float azimuth, float pitch, float roll) {
+        Log.w("SetRotationVector", "azimuth " + azimuth);
+        Log.w("SetRotationVector", "pitch " + pitch);
+        Log.w("SetRotationVector", "roll " + roll);
+
         RotationVectorAzimuth.add(azimuth);
         RotationVectorPitch.add(pitch);
         RotationVectorRoll.add(roll);
@@ -103,6 +111,16 @@ public class SensorData {
         Zpp.add(zpp);
     }
 
+    public void ClearData() {
+        RotationVectorAzimuth.clear();
+        RotationVectorPitch.clear();
+        RotationVectorRoll.clear();
+        Latitude.clear();
+        Longitude.clear();
+        Xpp.clear();
+        Ypp.clear();
+        Zpp.clear();
+    }
     public double GetMeanDouble(Vector<Double> v) {
         double sum = 0;
         int len = v.size();
@@ -111,9 +129,9 @@ public class SensorData {
             sum += v.get(i);
         }
 
-        v.clear();
         return  sum / len;
     }
+
 
     public float GetMeanFloat(Vector<Float> v) {
         float sum = 0;
@@ -123,7 +141,6 @@ public class SensorData {
             sum += v.get(i);
         }
 
-        v.clear();
         return  sum / len;
     }
 }
